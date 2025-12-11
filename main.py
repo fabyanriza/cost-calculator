@@ -54,6 +54,19 @@ data_thc = {
 }
 df_thc = pd.DataFrame(data_thc).set_index("Port")
 
+# E. DATA DEFAULT TOS (INBOUND / OUTBOUND)
+data_tos = {
+    "Port":    ["BLW","BTM","PLM","PKB","SPT","BMS","BLC","BPN",
+                "SDA","TRK","BRU","NNK","MKS","SBY","JKT","KBR"],
+    "Inbound": ["PORT","CY ( FIOST )","CY ( FIOST )","PORT","PORT","PORT","PORT","PORT",
+                "PORT","PORT","PORT","CY","PORT","PORT","PORT","PORT"],
+    "Outbound":["PORT","CY ( FIOST )","CY ( FIOST )","PORT","PORT","PORT","PORT","PORT",
+                "PORT","PORT","PORT","CY","PORT","PORT","PORT","PORT"],
+}
+df_tos = pd.DataFrame(data_tos).set_index("Port")
+
+HUBS = {"SBY", "JKT"}  # rute hub-hub = THC 0
+
 # ==========================================
 # 2. HELPER FUNCTIONS
 # ==========================================
@@ -117,17 +130,46 @@ def calculate_operational_cost(ship_name, route_str, ship_speed):
     }, None
 
 def generate_revenue_template(route_str):
+    """
+    Generate kombinasi OD berdasarkan urutan rute.
+    Contoh: JKT-SBY-MKS-SBY-JKT
+    -> JKT-MKS, SBY-MKS, JKT-SBY, MKS-JKT, MKS-SBY, SBY-JKT
+    - Hanya pasangan i < j (arah mengikuti pergerakan kapal)
+    - Skip asal = tujuan
+    - Skip duplikat (misal JKT-SBY muncul lebih dari sekali di rute)
+    """
     ports = route_str.replace(" ", "").upper().split("-")
-    if len(ports) < 2: return pd.DataFrame()
+    if len(ports) < 2:
+        return pd.DataFrame()
+
+    seen_pairs = set()
     rows = []
+
     for i in range(len(ports)):
-        for j in range(i+1, len(ports)):
+        for j in range(i + 1, len(ports)):
+            asal = ports[i]
+            tujuan = ports[j]
+
+            # Lewati kalau sama (JKT-JKT, SBY-SBY, dst.)
+            if asal == tujuan:
+                continue
+
+            key = (asal, tujuan)
+            if key in seen_pairs:
+                continue  # hindari duplikat
+
+            seen_pairs.add(key)
             rows.append({
-                "Kombinasi": f"{ports[i]}-{ports[j]}",
-                "Port Asal": ports[i], "Port Tujuan": ports[j],
-                "Jumlah Box": 0, "Harga/TEU (Rp)": 0, "Total Revenue (Rp)": 0
+                "Kombinasi": f"{asal}-{tujuan}",
+                "Port Asal": asal,          # THC OUTBOUND
+                "Port Tujuan": tujuan,      # THC INBOUND
+                "Jumlah Box": 0,
+                "Harga/TEU (Rp)": 0,
+                "Total Revenue (Rp)": 0
             })
+
     return pd.DataFrame(rows)
+
 
 # --- CALLBACK UNTUK AUTO-CALCULATE REVENUE ---
 def recalculate_revenue():
@@ -137,7 +179,7 @@ def recalculate_revenue():
     
     # 2. Terapkan perubahan ke DataFrame utama di session_state
     for row_idx, col_dict in updates["edited_rows"].items():
-        for col_name, new_val in col_dict.items():
+        for col_name, new_val in col_dict.items():  
             st.session_state.df_revenue.at[int(row_idx), col_name] = new_val
             
     # 3. Hitung Rumus Perkalian (Vectorized)
@@ -145,51 +187,156 @@ def recalculate_revenue():
         st.session_state.df_revenue["Jumlah Box"] * st.session_state.df_revenue["Harga/TEU (Rp)"]
     )
 
-def thc_effective_per_box(branch_port: str, homebase_port: str) -> float:
+def get_thc_rate(port: str, jenis: str, aksi: str) -> float:
     """
-    Implementasi rumus:
-    THC = (SBY FL + JKT FL) - (MT cabang + MT homebase)
+    port  : kode pelabuhan (SBY, JKT, MKS, ...)
+    jenis : 'FL' atau 'MT'
+    aksi  : 'L' (THL / loading) atau 'D' (THD / discharge)
+
+    Aturan:
+      - FULL (jenis='FL'):
+            jika default TOS = PORT -> rate = 0
+            jika CY / CY(FIOST)    -> pakai df_thc
+      - EMPTY (jenis='MT'):
+            TOS tidak menghapus biaya -> selalu pakai df_thc
     """
     try:
-        sby_fl = df_thc.loc["SBY", "FL"]
-        jkt_fl = df_thc.loc["JKT", "FL"]
-        branch_mt = df_thc.loc[branch_port, "MT"]
-        homebase_mt = df_thc.loc[homebase_port, "MT"]
+        dir_col = "Outbound" if aksi == "L" else "Inbound"
+        tos = df_tos.loc[port, dir_col]
     except KeyError:
         return 0.0
 
-    return (sby_fl + jkt_fl) - (branch_mt + homebase_mt)
+    # FULL: kalau TOS = PORT, gratis (0)
+    if jenis == "FL" and tos == "PORT":
+        return 0.0
 
-def calculate_total_thc(df_revenue: pd.DataFrame) -> float:
+    # Selain itu (FULL CY / CY(FIOST), dan semua EMPTY/MT)
+    try:
+        return float(df_thc.loc[port, jenis])
+    except KeyError:
+        return 0.0
+from collections import defaultdict
+
+def find_first_leg_index(route_ports, asal, tujuan):
     """
-    Hitung total THC dari df_revenue.
-    Hanya dihitung untuk pair hub (SBY/JKT) <-> cabang.
+    Cari posisi (index tujuan) pertama kali rute melewati asal->tujuan
+    berdasarkan urutan port di input_route.
+    Return: index tujuan (int) atau None jika tidak pernah terjadi.
     """
-    total = 0.0
-    hubs = {"SBY", "JKT"}
+    n = len(route_ports)
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            if route_ports[i] == asal and route_ports[j] == tujuan:
+                return j  # pakai index tujuan sebagai 'waktu sampai'
+    return None
+
+
+from collections import defaultdict
+
+def compute_empty_flows(df_revenue: pd.DataFrame, route_str: str):
+    """
+    Hitung aliran container kosong per leg (asal, tujuan) berdasarkan:
+    - go = leg yang muncul LEBIH AWAL di rute
+    - return = leg yang muncul LEBIH AKHIR di rute
+    Q_empty(return) = max(Q_go - Q_return, 0)
+    Q_empty(go)     = 0
+    """
+    route_ports = route_str.replace(" ", "").upper().split("-")
+
+    # volume full per arah
+    flows = {}
+    unordered_pairs = set()
 
     for _, row in df_revenue.iterrows():
         asal = str(row["Port Asal"])
         tujuan = str(row["Port Tujuan"])
-        boxes = row["Jumlah Box"]
+        if asal == tujuan:
+            continue
+        q = float(row["Jumlah Box"])
+        flows[(asal, tujuan)] = q
+        unordered_pairs.add(frozenset((asal, tujuan)))
 
-        if boxes <= 0:
+    empty_flow = defaultdict(float)
+
+    for pair in unordered_pairs:
+        a, b = tuple(pair)
+        q_ab = flows.get((a, b), 0.0)
+        q_ba = flows.get((b, a), 0.0)
+
+        # kalau salah satu arah tidak ada di tabel => tidak ada balikan => no empty
+        if q_ab == 0.0 or q_ba == 0.0:
             continue
 
-        if asal in hubs and tujuan not in hubs:
-            branch = tujuan
-            homebase = asal
-        elif tujuan in hubs and asal not in hubs:
-            branch = asal
-            homebase = tujuan
+        pos_ab = find_first_leg_index(route_ports, a, b)
+        pos_ba = find_first_leg_index(route_ports, b, a)
+
+        # kalau salah satu tidak pernah muncul di rute => skip empty
+        if pos_ab is None or pos_ba is None:
+            continue
+
+        # tentukan siapa "go" dan siapa "return"
+        if pos_ab < pos_ba:
+            go_dir = (a, b)
+            ret_dir = (b, a)
+            q_go, q_ret = q_ab, q_ba
         else:
-            # kalau sama-sama hub atau sama-sama cabang: THC tidak dihitung dengan rumus ini
+            go_dir = (b, a)
+            ret_dir = (a, b)
+            q_go, q_ret = q_ba, q_ab
+
+        q_empty = max(q_go - q_ret, 0.0)   # kalau negatif -> 0
+        if q_empty > 0:
+            empty_flow[ret_dir] = q_empty
+
+    return empty_flow
+
+
+def calculate_total_thc(df_revenue: pd.DataFrame, route_str: str):
+    """
+    Hitung total THC:
+      - THC FULL  = (THL_FL(asal) + THD_FL(tujuan)) * Q_full
+      - THC EMPTY = (THL_MT(asal) + THD_MT(tujuan)) * Q_empty
+    Q_empty hanya muncul di LEG BALIKAN (lihat compute_empty_flows).
+    Rute hub-hub (SBY<->JKT) -> THC = 0.
+    """
+    empty_flow = compute_empty_flows(df_revenue, route_str)
+    total = 0.0
+    detail_rows = []
+
+    for _, row in df_revenue.iterrows():
+        asal = str(row["Port Asal"])
+        tujuan = str(row["Port Tujuan"])
+        q_full = float(row["Jumlah Box"])
+
+        # hub-hub: semua 0
+        if asal in HUBS and tujuan in HUBS:
+            detail_rows.append([asal, tujuan, q_full, 0.0, 0.0])
             continue
 
-        thc_per_box = thc_effective_per_box(branch, homebase)
-        total += boxes * thc_per_box
+        # THC FULL (FL)
+        rate_thl_fl = get_thc_rate(asal,   "FL", "L")
+        rate_thd_fl = get_thc_rate(tujuan, "FL", "D")
+        thc_full = q_full * (rate_thl_fl + rate_thd_fl)
 
-    return total
+        # THC EMPTY (MT) hanya di leg balikan
+        q_empty = max(empty_flow.get((asal, tujuan), 0.0), 0.0)
+        rate_thl_mt = get_thc_rate(asal,   "MT", "L")
+        rate_thd_mt = get_thc_rate(tujuan, "MT", "D")
+        thc_empty = q_empty * (rate_thl_mt + rate_thd_mt)
+
+        subtotal = thc_full + thc_empty
+        total += subtotal
+
+        detail_rows.append([
+            asal, tujuan, q_full, q_empty, subtotal
+        ])
+
+    df_detail = pd.DataFrame(
+        detail_rows,
+        columns=["Asal", "Tujuan", "Q_full", "Q_empty", "THC_leg"]
+    )
+    return total, df_detail
+
 
 
 
@@ -273,14 +420,16 @@ with col2:
         # Summary Profit
         total_rev = st.session_state.df_revenue["Total Revenue (Rp)"].sum()
         total_box = st.session_state.df_revenue["Jumlah Box"].sum()
-        total_thc = calculate_total_thc(st.session_state.df_revenue)
+        total_thc, df_thc_detail = calculate_total_thc(
+            st.session_state.df_revenue,
+            input_route
+        )
         
         st.markdown("### Summary")
         m1, m2, m3 = st.columns(3)
         m4 = st.columns(1)[0]
         m1.metric("Total Box", f"{total_box:,.0f}")
-        with m2:
-            m2.metric("Revenue", format_rupiah_compact(total_rev))
+        m2.metric("Revenue", format_rupiah_compact(total_rev))
         
         profit = total_rev - total_cost - total_thc
         color = "normal" if profit > 0 else "off"
@@ -292,6 +441,9 @@ with col2:
         )
         m4.metric("Total THC (juta Rp)", format_rupiah_compact(total_thc))
 
-        
+        # opsional: tampilkan rincian THC per leg (buat cek logika)
+        with st.expander("Rincian THC per Leg"):
+            st.dataframe(df_thc_detail, use_container_width=True)
+
     else:
         st.info("Masukkan rute yang valid.")
