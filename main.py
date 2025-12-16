@@ -367,8 +367,8 @@ with st.sidebar:
         "Kecepatan Kapal (knot)",
         min_value=1.0,
         max_value=30.0,
-        value=20.0,
-        step=0.5
+        value=10.0,
+        step=1.0
     )
     
     # Reset Revenue Table jika rute berubah
