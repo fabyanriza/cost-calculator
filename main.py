@@ -350,7 +350,17 @@ with st.sidebar:
     st.header("Input Data")
     selected_ship = st.selectbox("Pilih Kapal", df_kapal["Nama Kapal"])
     input_route = st.text_input("Rute (ex: SBY-JKT-MKS)", "SBY-JKT-MKS")
-    harga_bbm = st.number_input("Harga BBM (Rp/Liter)", 10000, step=100)
+    fuel_type = st.selectbox(
+        "Jenis BBM",
+        ["MFO (Marine Fuel Oil)", "Biosolar"]
+    )
+
+    fuel_price_map = {
+        "MFO (Marine Fuel Oil)": 12000,
+        "Biosolar": 17000
+    }
+    harga_bbm = fuel_price_map[fuel_type]
+    st.caption(f"Harga terpilih: Rp {harga_bbm:,.0f} / Liter")
     
         # >>> input baru: speed kapal
     ship_speed = st.number_input(
