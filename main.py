@@ -530,42 +530,52 @@ with col2:
         total_rev = st.session_state.df_revenue["Total Revenue (Rp)"].sum()
         total_box = st.session_state.df_revenue["Jumlah Box"].sum()
         
-        # Hitung THC berdasarkan Revenue Table
+                # Hitung THC berdasarkan Revenue Table
         total_thc, df_thc_detail = calculate_total_thc_per_port(st.session_state.df_revenue)
 
-        
-        # --- SECTION 3: THC & PROFIT SUMMARY ---
-        st.markdown("### Summary Performance")
-        
-        # Layout Summary
-        # Baris 1: Revenue & Box
-        r1, r2 = st.columns(2)
-        r1.metric("Total Box", f"{total_box:,.0f} TEUs")
-        r2.metric("Total Revenue", format_rupiah_compact(total_rev))
-        
-        st.divider()
-        
-        # Baris 2: Section THC (Sesuai Request: Bagian ke-3)
-        st.markdown("#### C. Terminal Handling (THC)")
+        # =========================
+        # (Opsional) tampilkan rincian THC tetap di sini
+        # =========================
+        st.markdown("#### Terminal Handling (THC)")
         t1, t2 = st.columns([1, 2])
         t1.metric("Total THC", format_rupiah_compact(total_thc))
         with t2:
-            with st.expander("Lihat Rincian THC (per Port)"):
-                st.dataframe(df_thc_detail, use_container_width=True, hide_index=True)
+            st.markdown("Rincian THC (per Port)")
+            st.dataframe(df_thc_detail, use_container_width=True, hide_index=True)
 
-        st.divider()
-
-        
-        # Final Profit Calculation
+        # =========================
+        # HITUNG SEMUA ANGKA TOTAL
+        # =========================
         profit = total_rev - total_cost_final - total_thc
-        color = "normal" if profit > 0 else "off"
-        
-        st.metric(
-            "NET PROFIT / (LOSS)", 
-            format_rupiah_compact(profit), 
-            delta_color=color,
+        is_profit = profit >= 0
+
+        # =========================
+        # TOTAL & SUMMARY DI PALING BAWAH
+        # =========================
+        st.divider()
+        st.markdown("### Ringkasan Akhir (Total)")
+
+        # Baris total utama
+        s1, s2, s3 = st.columns(3)
+        s1.metric("Total Box", f"{total_box:,.0f} TEUs")
+        s2.metric("Total Revenue", format_rupiah_compact(total_rev))
+        s3.metric("Total Cost (BBM+DOC)", format_rupiah_compact(total_cost_final))
+
+        s4, s5 = st.columns(2)
+        # Profit metric dengan warna hijau/merah via delta_color
+        s5.metric(
+            "NET PROFIT / (LOSS)",
+            format_rupiah_compact(profit),
+            delta=("PROFIT" if is_profit else "LOSS"),
+            delta_color=("normal" if is_profit else "inverse"),
             help="Revenue - (BBM + DOC + THC)"
         )
-        
-    else:
-        st.info("Masukkan rute yang valid.")
+
+        # Total THC ikut berwarna (via delta)
+        s4.metric(
+            "Total THC",
+            format_rupiah_compact(total_thc),
+            
+            help="Terminal Handling Charges"
+        )
+
