@@ -26,10 +26,18 @@ ports_order = [
     "SRI","SRG","TRK","TTE","TIM","TUA"
 ]
 
-# Database Port: Waktu Sandar Default 24 Jam
+ports_stay = {
+    "AMB": 2, "BPN": 1, "BMS": 1, "BTM": 3, "BAU": 2, "BRU": 4, "BIA": 1, "BIT": 2,
+    "FAK": 1, "GTO": 1, "JKT": 1, "JYP": 2, "KAI": 1, "KDR": 1, "KTG": 1, "MKS": 1,
+    "MRI": 2, "MKE": 2, "NBR": 2, "NNK": 2, "PDG": 1, "PAL": 2, "PKB": 2, "PRW": 2,
+    "PNK": 2, "SDA": 1, "SPT": 1, "SMG": 1, "SBY": 1, "SRI": 1, "SRG": 1, "TRK": 1,
+    "TTE": 3, "TIM": 2, "TUA": 2,
+}
+
+
 df_port = pd.DataFrame({
     "Port": ports_order,
-    "Port_Stay_Hours": [24.0] * len(ports_order) 
+    "Port_Stay_Hours": [ports_stay.get(port, 24.0) for port in ports_order]
 })
 
 # Matrix Jarak
@@ -79,26 +87,55 @@ df_jarak_flat.columns = ['Asal', 'Tujuan', 'Jarak']
 
 
 # C. DATA THC & TOS (Tidak berubah)
+import pandas as pd
+
+# =========================
+# THC (FL / MT) - sesuai tabel
+# =========================
 data_thc = {
-    "Port": ["BLW","BTM","PLM","PKB","SPT","BMS","BLC","BPN",
-             "SDA","TRK","BRU","NNK","MKS","SBY","JKT","KBR"],
-    "FL":   [1080024, 566500, 687500, 883589, 535568, 688800, 722267, 1035101,
-             940500, 915215, 617375, 981747, 807904, 840215, 872500, 840215],
-    "MT":   [503982, 381260, 515625, 577931, 377300, 490001, 403596, 716650,
-             636900, 499934, 320100, 585935, 437250, 584200, 564400, 584200],
+    "Port": [
+        "AMB","BPN","BMS","BTM","BLC","BAU","BRU","BIA","BIT","FAK","GTO","JKT","JYP",
+        "KAI","KDR","KTG","LUW","MKS","MRI","BLW","MKE","NBR","NNK","PDG","PAL","PKB",
+        "PRW","PNK","SDA","SPT","SMG","SRI","SRG","TRK","TTE","TIM","TUA","SBY"
+    ],
+    "FL": [
+        1454732, 1035101, 688800, 566500, 722267, 724519, 617375, 2635218, 926200, 3656562, 991870, 872500, 1453639,
+        445500, 758437, 213300, 1760000, 807904, 2182970, 1080024, 2750000, 2307171, 981747, 973500, 904775, 883589,
+        883589, 879000, 940500, 535568, 758437, 1156111, 2132967, 915215, 1581270, 1139815, 2785640, 840215
+    ],
+    "MT": [
+        740860, 716650, 490001, 381260, 403596, 318843, 320100, 1319825, 610060, 804856, 410073, 564400, 690372,
+        136510, 363173, 130350, 440000, 437250, 789237, 503982, 664718, 880816, 585935, 566500, 334602, 577931,
+        577931, 563850, 636900, 377300, 481800, 590615, 759008, 499934, 318010, 366112, 1193060, 584200
+    ],
 }
 df_thc = pd.DataFrame(data_thc).set_index("Port")
 
+# =========================
+# Default TOS (Inbound/Outbound) - sesuai tabel
+# =========================
 data_tos = {
-    "Port":    ["BLW","BTM","PLM","PKB","SPT","BMS","BLC","BPN",
-                "SDA","TRK","BRU","NNK","MKS","SBY","JKT","KBR"],
-    "Inbound": ["PORT","CY ( FIOST )","CY ( FIOST )","PORT","PORT","PORT","PORT","PORT",
-                "PORT","PORT","PORT","CY","PORT","PORT","PORT","PORT"],
-    "Outbound":["PORT","CY ( FIOST )","CY ( FIOST )","PORT","PORT","PORT","PORT","PORT",
-                "PORT","PORT","PORT","CY","PORT","PORT","PORT","PORT"],
+    "Port": [
+        "AMB","BPN","BMS","BTM","BLC","BAU","BRU","BIA","BIT","FAK","GTO","JKT","JYP",
+        "KAI","KDR","KTG","LUW","MKS","MRI","BLW","MKE","NBR","NNK","PDG","PAL","PKB",
+        "PRW","PNK","SDA","SPT","SMG","SRI","SRG","TRK","TTE","TIM","TUA","SBY"
+    ],  
+    "Inbound": [
+        "CY ( FIOST )","PORT","PORT","CY ( FIOST )","PORT","CY ( FIOST )","PORT","CY","PORT","CY ( FIOST )","PORT","PORT","PORT",
+        "CY ( FIOST )","CY ( FIOST )","CY ( FIOST )","CY ( FIOST )","PORT","CY ( FIOST )","PORT","PORT","CY ( FIOST )","CY","CY ( FIOST )","CY",
+        "PORT","PORT","CY ( FIOST )","PORT","PORT","CY","CY","PORT","PORT","PORT","CY ( FIOST )","CY ( FIOST )","PORT"
+    ],
+    "Outbound": [
+        "CY ( FIOST )","PORT","PORT","CY ( FIOST )","PORT","CY ( FIOST )","PORT","CY","PORT","CY ( FIOST )","PORT","PORT","PORT",
+        "CY","CY ( FIOST )","CY ( FIOST )","CY ( FIOST )","PORT","CY ( FIOST )","PORT","PORT","CY","CY","CY ( FIOST )","CY",
+        "PORT","PORT","CY ( FIOST )","PORT","PORT","CY","CY","PORT","PORT","CY ( FIOST )","CY ( FIOST )","CY ( FIOST )","PORT"
+    ],
 }
 df_tos = pd.DataFrame(data_tos).set_index("Port")
+
+# HUBS tetap
 HUBS = {"SBY", "JKT"}
+
 
 # ==========================================
 # 2. HELPER FUNCTIONS
@@ -228,13 +265,14 @@ from collections import defaultdict
 import pandas as pd
 
 def get_thc_rate(port, jenis, aksi):
+    dir_col = "Outbound" if aksi == "L" else "Inbound"
+
     try:
-        dir_col = "Outbound" if aksi == "L" else "Inbound"
-        tos = df_tos.loc[port, dir_col]
+        tos = str(df_tos.loc[port, dir_col]).strip().upper()
     except KeyError:
         return 0.0
 
-    # aturan: FULL + TOS=PORT => THC 0
+    # FULL + TOS=PORT => THC 0
     if jenis == "FL" and tos == "PORT":
         return 0.0
 
@@ -242,6 +280,7 @@ def get_thc_rate(port, jenis, aksi):
         return float(df_thc.loc[port, jenis])
     except KeyError:
         return 0.0
+
 
 
 def _build_full_flows(df_revenue):
