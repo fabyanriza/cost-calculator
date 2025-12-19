@@ -37,7 +37,7 @@ ports_stay = {
 
 df_port = pd.DataFrame({
     "Port": ports_order,
-    "Port_Stay_Hours": [ports_stay.get(port, 24.0) for port in ports_order]
+    "Port_Stay_Hours": [ports_stay.get(port, 1.0) * 24.0 for port in ports_order]
 })
 
 # Matrix Jarak
