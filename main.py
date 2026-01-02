@@ -85,8 +85,6 @@ df_matrix = pd.DataFrame(matrix_data, columns=ports_order, index=ports_order)
 df_jarak_flat = df_matrix.stack().reset_index()
 df_jarak_flat.columns = ['Asal', 'Tujuan', 'Jarak']
 
-
-# C. DATA THC & TOS (Tidak berubah)
 import pandas as pd
 
 # =========================
