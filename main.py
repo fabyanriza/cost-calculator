@@ -10,7 +10,7 @@ st.set_page_config(page_title="Shipping Calculation Dashboard", layout="wide")
 # 1. DATABASE SETUP
 # ==========================================
 
-# A. DATA KAPAL (DOC_OH = Daily Rate)
+# A. DATA KAPAL 
 data_kapal = {
     "Nama Kapal": ["AKA", "ASJ", "ASN", "BGI", "BKU", "BSA", "PBI"],
     "ME_Cons_L_Day": [4050, 6800, 10500, 4500, 4500, 4500, 7410],
