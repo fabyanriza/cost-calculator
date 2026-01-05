@@ -87,9 +87,7 @@ df_jarak_flat.columns = ['Asal', 'Tujuan', 'Jarak']
 
 import pandas as pd
 
-# =========================
-# THC (FL / MT) - sesuai tabel
-# =========================
+# data thc sesuai tabel
 data_thc = {
     "Port": [
         "AMB","BPN","BMS","BTM","BLC","BAU","BRU","BIA","BIT","FAK","GTO","JKT","JYP",
