@@ -562,7 +562,7 @@ with col2:
             hide_index=True, use_container_width=True, key="editor_revenue", on_change=recalculate_revenue
         )
         
-        total_rev = st.session_state.df_revenue["Total Revenue (Rp)"].sum()
+        total_rev = st.session_state.df_revenue["Total Revenue (Rp)"].sum() * 1.8
         total_box = st.session_state.df_revenue["Jumlah Box"].sum()
         
                 # Hitung THC berdasarkan Revenue Table
