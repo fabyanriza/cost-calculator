@@ -12,10 +12,10 @@ st.set_page_config(page_title="Shipping Calculation Dashboard", layout="wide")
 
 # A. DATA KAPAL 
 data_kapal = {
-    "Nama Kapal": ["AKA", "ASJ", "ASN", "BGI", "BKU", "BSA", "PBI"],
-    "ME_Cons_L_Day": [4050, 6800, 10500, 4500, 4500, 4500, 7410],
-    "AE_Cons_L_Day": [500, 1100, 1080, 528, 528, 528, 300],
-    "DOC_OH": [66504323, 93106052, 93106052, 66504323, 66504323, 66504323, 66504323]
+    "Nama Kapal": ["AKA", "ASJ", "ASN", "BGI", "BKU", "BSA", "PBI", "OSI", "ORU"],
+    "ME_Cons_L_Day": [4050, 6800, 10500, 4500, 4500, 4500, 7410, 34000, 36000],
+    "AE_Cons_L_Day": [500, 1100, 1080, 528, 528, 528, 300, 1650, 1800],
+    "DOC_OH": [66504323, 93106052, 93106052, 66504323, 66504323, 66504323, 66504323, 133008645, 159610374]
 }
 df_kapal = pd.DataFrame(data_kapal)
 
