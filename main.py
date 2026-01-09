@@ -254,7 +254,7 @@ def recalculate_revenue():
         for col_name, new_val in col_dict.items():  
             st.session_state.df_revenue.at[int(row_idx), col_name] = new_val
     st.session_state.df_revenue["Total Revenue (Rp)"] = (
-        st.session_state.df_revenue["Jumlah Box"] * st.session_state.df_revenue["Harga/TEU (Rp)"]
+        st.session_state.df_revenue["Jumlah Box"] * st.session_state.df_revenue["Harga/TEU (Rp)"] # * 1.8
     )
 
 from collections import defaultdict
@@ -462,7 +462,7 @@ with st.sidebar:
     st.header("2. Harga Bahan Bakar")
     
     fuel_options = ["MFO (Marine Fuel Oil)", "Biosolar"]
-    fuel_prices = {"MFO (Marine Fuel Oil)": 12000, "Biosolar": 17000}
+    fuel_prices = {"MFO (Marine Fuel Oil)": 12600, "Biosolar": 20750}
     
     # Dual Input BBM (Sesuai Request)
     fuel_type_me = st.selectbox("Jenis BBM Main Engine (ME)", fuel_options, index=0)
