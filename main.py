@@ -3,14 +3,17 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict
 
-# --- KONFIGURASI HALAMAN ---
+# ==========================================
+# 0. KONFIGURASI HALAMAN
+# ==========================================
 st.set_page_config(page_title="Shipping Calculation Dashboard", layout="wide")
+
 
 # ==========================================
 # 1. DATABASE SETUP
 # ==========================================
 
-# A. DATA KAPAL 
+# A. DATA KAPAL
 data_kapal = {
     "Nama Kapal": ["AKA", "ASJ", "ASN", "BGI", "BKU", "BSA", "PBI", "OSI", "ORU"],
     "ME_Cons_L_Day": [4050, 6800, 10500, 4500, 4500, 4500, 7410, 34000, 36000],
@@ -34,13 +37,19 @@ ports_stay = {
     "TTE": 3, "TIM": 2, "TUA": 2,
 }
 
-
 df_port = pd.DataFrame({
     "Port": ports_order,
     "Port_Stay_Hours": [ports_stay.get(port, 1.0) * 24.0 for port in ports_order]
 })
 
-# Jarak antar pelabuhan dalam nautical miles (NM)
+NAV_PAGES = [
+    "Estimasi Biaya Operasional (BBM)",
+    "Biaya Operasional (DOC+OH)",
+    "Perencanaan Revenue & THC",
+    "Ringkasan Akhir",
+]
+
+# Jarak antar pelabuhan (NM)
 matrix_data = [
      [0.0, 1284.78, 1509.68, 2729.22, 1348.77, 659.7, 1329.43, 924.05, 617.72, 462.5, 704.85, 2377.86, 1396.6, 623.46, 623.16, 1615.55, 648.54, 991.49, 709.41, 3375.55, 1472.12, 824.31, 1428.26, 3101.49, 964.9, 2979.71, 964.9, 2123.0, 1253.08, 1689.04, 2005.64, 1763.5, 921.08, 433.52, 1399.64, 457.58, 970.3, 558.48],
     [1284.78, 0.0, 346.14, 1444.46, 267.53, 801.4, 376.65, 2135.35, 978.75, 1736.13, 722.16, 1228.38, 2663.45, 1905.96, 716.43, 820.7, 668.47, 528.0, 1922.39, 2094.81, 2737.56, 2101.06, 597.08, 1828.29, 344.95, 1696.42, 344.96, 838.55, 79.62, 451.89, 954.68, 661.06, 2149.38, 1607.73, 531.82, 1198.27, 2255.08, 1829.4],
@@ -81,13 +90,15 @@ matrix_data = [
     [970.3, 1829.4, 2025.6, 3270.59, 1864.52, 1117.7, 1887.81, 661.09, 1129.83, 279.06, 1257.6, 2934.16, 314.52, 556.43, 1590.49, 3030.64, 1681.71, 1950.62, 410.47, 4611.54, 770.19, 435.11, 3033.4, 5033.89, 2381.23, 5451.17, 2381.23, 4298.03, 2135.35, 2401.99, 4298.03, 3386.27, 438.1, 1276.33, 1276.33, 1527.96, 0.0, 770.19],
     [558.48, 659.06, 836.45, 3270.59, 1864.52, 1117.7, 1887.81, 661.09, 1129.83, 279.06, 1257.6, 2934.16, 1036.1, 98.2, 1091.83, 2658.23, 1255.95, 1461.77, 369.11, 4101.56, 1125.95, 533.26, 2781.21, 4101.56, 1969.8, 3270.59, 1969.8, 3033.4, 1905.96, 2131.45, 3091.07, 3386.27, 257.25, 485.3, 981.63, 1006.25, 770.19, 0.0]
 ]
+# ========================= IMPORTANT =========================
+# Paste matrix_data lengkap kamu di atas (yang panjang itu),
+# lalu uncomment 3 baris di bawah ini.
+# =============================================================
 df_matrix = pd.DataFrame(matrix_data, columns=ports_order, index=ports_order)
 df_jarak_flat = df_matrix.stack().reset_index()
 df_jarak_flat.columns = ['Asal', 'Tujuan', 'Jarak']
 
-import pandas as pd
-
-# data thc sesuai tabel
+# THC
 data_thc = {
     "Port": [
         "AMB","BPN","BMS","BTM","BLC","BAU","BRU","BIA","BIT","FAK","GTO","JKT","JYP",
@@ -107,15 +118,13 @@ data_thc = {
 }
 df_thc = pd.DataFrame(data_thc).set_index("Port")
 
-# =========================
-# Default TOS (Inbound/Outbound) - sesuai tabel
-# =========================
+# Default TOS
 data_tos = {
     "Port": [
         "AMB","BPN","BMS","BTM","BLC","BAU","BRU","BIA","BIT","FAK","GTO","JKT","JYP",
         "KAI","KDR","KTG","LUW","MKS","MRI","BLW","MKE","NBR","NNK","PDG","PAL","PKB",
         "PRW","PNK","SDA","SPT","SMG","SRI","SRG","TRK","TTE","TIM","TUA","SBY"
-    ],  
+    ],
     "Inbound": [
         "CY ( FIOST )","PORT","PORT","CY ( FIOST )","PORT","CY ( FIOST )","PORT","CY","PORT","CY ( FIOST )","PORT","PORT","PORT",
         "CY ( FIOST )","CY ( FIOST )","CY ( FIOST )","CY ( FIOST )","PORT","CY ( FIOST )","PORT","PORT","CY ( FIOST )","CY","CY ( FIOST )","CY",
@@ -129,140 +138,122 @@ data_tos = {
 }
 df_tos = pd.DataFrame(data_tos).set_index("Port")
 
-# HUBS tetap
+# HUBS
 HUBS = {"SBY", "JKT"}
 
 
 # ==========================================
 # 2. HELPER FUNCTIONS
 # ==========================================
-
 def get_distance(port_a, port_b):
     res = df_jarak_flat[(df_jarak_flat["Asal"] == port_a) & (df_jarak_flat["Tujuan"] == port_b)]
-    if not res.empty: return res.iloc[0]["Jarak"]
+    if not res.empty:
+        return float(res.iloc[0]["Jarak"])
     return -1
 
 def format_rupiah_compact(x: float) -> str:
     sign = "-" if x < 0 else ""
-    n = abs(x)
+    n = abs(float(x))
     if n >= 1_000_000_000:
         val = n / 1_000_000_000
         suffix = " M"
-    elif n >= 1_000_000:
+        return f"Rp {sign}{val:,.0f}{suffix}"
+    if n >= 1_000_000:
         val = n / 1_000_000
         suffix = " JT"
-    else:
-        return f"Rp {x:,.0f}"
-    return f"Rp {sign}{val:,.0f}{suffix}"
+        return f"Rp {sign}{val:,.0f}{suffix}"
+    return f"Rp {sign}{n:,.0f}"
 
 def calculate_operational_cost(ship_name, route_str, ship_speed):
-    # LOGIC BARU: VARIABLE COST BASED ON TIME
-    
     kapal = df_kapal[df_kapal["Nama Kapal"] == ship_name].iloc[0]
-    me_cons_daily = kapal["ME_Cons_L_Day"]
-    ae_cons_daily = kapal["AE_Cons_L_Day"]
-    doc_daily_rate = kapal["DOC_OH"] # Daily Rate
+    me_cons_daily = float(kapal["ME_Cons_L_Day"])
+    ae_cons_daily = float(kapal["AE_Cons_L_Day"])
+    doc_daily_rate = float(kapal["DOC_OH"])
 
     route_clean = route_str.replace(" ", "").upper()
     ports = route_clean.split("-")
-    if len(ports) < 2: return None, "Rute minimal 2 pelabuhan."
+    if len(ports) < 2:
+        return None, "Rute minimal 2 pelabuhan."
 
-    # --- 1. Calculate Sailing Time ---
-    total_dist = 0
-    total_sailing_days = 0
-    
-    for i in range(len(ports)-1):
-        if ports[i] not in ports_order or ports[i+1] not in ports_order:
+    total_dist = 0.0
+    total_sailing_days = 0.0
+
+    for i in range(len(ports) - 1):
+        if ports[i] not in ports_order or ports[i + 1] not in ports_order:
             return None, f"Port tidak dikenal: {ports[i]} atau {ports[i+1]}"
-        d = get_distance(ports[i], ports[i+1])
-        if d < 0: return None, f"Jarak not found: {ports[i]}-{ports[i+1]}"
-        
+        d = get_distance(ports[i], ports[i + 1])
+        if d < 0:
+            return None, f"Jarak not found: {ports[i]}-{ports[i+1]}"
         total_dist += d
-        total_sailing_days += (d / ship_speed) / 24
+        total_sailing_days += (d / float(ship_speed)) / 24.0
 
-    # --- 2. Calculate Port Time (Based on Default 24 Hours) ---
-    total_port_stay_hours = 0
+    total_port_stay_hours = 0.0
     for p in ports:
-        # Ambil durasi sandar dari database (Default 24 jam)
         p_data = df_port[df_port["Port"] == p]
-        if not p_data.empty:
-            stay_hours = p_data.iloc[0]["Port_Stay_Hours"]
-        else:
-            stay_hours = 24.0 # Safety default
+        stay_hours = float(p_data.iloc[0]["Port_Stay_Hours"]) if not p_data.empty else 24.0
         total_port_stay_hours += stay_hours
-
     total_port_days = total_port_stay_hours / 24.0
 
-    # --- 3. Calculate Fuel Physical Units (Liter) ---
-    # Sailing: ME + AE
+    # Fuel (liter)
     fuel_me_sailing = total_sailing_days * me_cons_daily
     fuel_ae_sailing = total_sailing_days * ae_cons_daily
-    
-    # Port: AE Only (ME = 0)
-    fuel_me_port = 0
     fuel_ae_port = total_port_days * ae_cons_daily
-    
-    total_me = fuel_me_sailing + fuel_me_port
-    total_ae = fuel_ae_sailing + fuel_ae_port
 
-    # --- 4. Calculate DOC+OH (New Logic: Time Based) ---
     total_days_trip = total_sailing_days + total_port_days
     total_doc_cost = total_days_trip * doc_daily_rate
-
-    # Port Cost dihapus (Rp 0)
-    port_cost_rp = 0 
 
     return {
         "Jarak": total_dist,
         "Sailing_Days": total_sailing_days,
         "Port_Days": total_port_days,
         "Total_Days": total_days_trip,
-        
-        # Breakdown BBM Detail
+
         "ME_Sailing_L": fuel_me_sailing,
         "AE_Sailing_L": fuel_ae_sailing,
         "AE_Port_L": fuel_ae_port,
-        "ME_L": total_me, # Total ME
-        "AE_L": total_ae, # Total AE
-        
-        "DOC_Daily_Rate": doc_daily_rate, 
+
+        "DOC_Daily_Rate": doc_daily_rate,
         "DOC_Total_Cost": total_doc_cost,
-        "Port_Total_Cost": port_cost_rp
     }, None
 
 def generate_revenue_template(route_str):
     ports = route_str.replace(" ", "").upper().split("-")
-    if len(ports) < 2: return pd.DataFrame()
+    if len(ports) < 2:
+        return pd.DataFrame()
     seen_pairs = set()
     rows = []
     for i in range(len(ports)):
         for j in range(i + 1, len(ports)):
             asal, tujuan = ports[i], ports[j]
-            if asal == tujuan: continue
+            if asal == tujuan:
+                continue
             key = (asal, tujuan)
-            if key in seen_pairs: continue
+            if key in seen_pairs:
+                continue
             seen_pairs.add(key)
             rows.append({
-                "Kombinasi": f"{asal}-{tujuan}", "Port Asal": asal, "Port Tujuan": tujuan,
-                "Jumlah Box": 0, "Harga/TEU (Rp)": 0, "Total Revenue (Rp)": 0
+                "Kombinasi": f"{asal}-{tujuan}",
+                "Port Asal": asal,
+                "Port Tujuan": tujuan,
+                "Jumlah Box": 0,
+                "Harga/TEU (Rp)": 0,
+                "Total Revenue (Rp)": 0
             })
     return pd.DataFrame(rows)
 
 def recalculate_revenue():
-    updates = st.session_state["editor_revenue"]
-    for row_idx, col_dict in updates["edited_rows"].items():
-        for col_name, new_val in col_dict.items():  
+    updates = st.session_state.get("editor_revenue", None)
+    if not updates:
+        return
+    for row_idx, col_dict in updates.get("edited_rows", {}).items():
+        for col_name, new_val in col_dict.items():
             st.session_state.df_revenue.at[int(row_idx), col_name] = new_val
     st.session_state.df_revenue["Total Revenue (Rp)"] = (
-        st.session_state.df_revenue["Jumlah Box"] * st.session_state.df_revenue["Harga/TEU (Rp)"] # * 1.8
+        st.session_state.df_revenue["Jumlah Box"] * st.session_state.df_revenue["Harga/TEU (Rp)"]
     )
-
-from collections import defaultdict
-import pandas as pd
 
 def get_thc_rate(port, jenis, aksi):
     dir_col = "Outbound" if aksi == "L" else "Inbound"
-
     try:
         tos = str(df_tos.loc[port, dir_col]).strip().upper()
     except KeyError:
@@ -277,13 +268,10 @@ def get_thc_rate(port, jenis, aksi):
     except KeyError:
         return 0.0
 
-
-
 def _build_full_flows(df_revenue):
-    """Gabungkan jika ada duplicate leg (asal-tujuan) di df_revenue."""
     flows = defaultdict(float)
     for _, row in df_revenue.iterrows():
-        asal  = str(row["Port Asal"]).strip().upper()
+        asal = str(row["Port Asal"]).strip().upper()
         tujuan = str(row["Port Tujuan"]).strip().upper()
         if asal == tujuan:
             continue
@@ -291,26 +279,16 @@ def _build_full_flows(df_revenue):
         flows[(asal, tujuan)] += q
     return flows
 
-
 def compute_empty_flows(df_revenue):
-    """
-    Logika baru:
-    Untuk setiap pasangan port (a,b):
-      net = FULL(a->b) - FULL(b->a)
-      jika net > 0 => b surplus empty, kirim empty b->a sebesar net
-      jika net < 0 => a surplus empty, kirim empty a->b sebesar -net
-    Ini otomatis membuat total empty di suatu port = total inbound - total outbound (jika positif).
-    """
     full_flows = _build_full_flows(df_revenue)
-
     ports = set()
     for a, b in full_flows.keys():
-        ports.add(a); ports.add(b)
+        ports.add(a)
+        ports.add(b)
 
     empty_flow = defaultdict(float)
-
-    # hitung net per pasangan tanpa syarat "dua arah harus ada"
     ports = sorted(ports)
+
     for i in range(len(ports)):
         for j in range(i + 1, len(ports)):
             a, b = ports[i], ports[j]
@@ -318,61 +296,16 @@ def compute_empty_flows(df_revenue):
             q_ba = full_flows.get((b, a), 0.0)
             net = q_ab - q_ba
             if net > 0:
-                empty_flow[(b, a)] += net   # empty balik dari b ke a
+                empty_flow[(b, a)] += net
             elif net < 0:
-                empty_flow[(a, b)] += -net  # empty balik dari a ke b
+                empty_flow[(a, b)] += -net
 
     return empty_flow
 
-
-def calculate_total_thc(df_revenue, route_str=None):
-    """
-    - THC FULL dihitung dari q_full pada leg
-    - THC EMPTY dihitung dari q_empty pada leg (hasil net flow)
-    - Leg empty yang tidak ada di df_revenue tetap dimasukkan (q_full=0)
-    """
-    full_flows  = _build_full_flows(df_revenue)
+def calculate_total_thc_per_port(df_revenue):
+    full_flows = _build_full_flows(df_revenue)
     empty_flows = compute_empty_flows(df_revenue)
 
-    all_legs = set(full_flows.keys()) | set(empty_flows.keys())
-
-    total = 0.0
-    detail_rows = []
-
-    for (asal, tujuan) in sorted(all_legs):
-        q_full  = full_flows.get((asal, tujuan), 0.0)
-        q_empty = empty_flows.get((asal, tujuan), 0.0)
-
-        # kalau dua-duanya 0, skip
-        if q_full == 0 and q_empty == 0:
-            continue
-
-        # jika HUB-HUB kamu memang tidak dikenakan THC per leg, pertahankan rule ini:
-        if asal in HUBS and tujuan in HUBS:
-            detail_rows.append([asal, tujuan, q_full, q_empty, 0.0, 0.0, 0.0])
-            continue
-
-        # FULL
-        thc_full = q_full * (get_thc_rate(asal, "FL", "L") + get_thc_rate(tujuan, "FL", "D"))
-        # EMPTY
-        thc_empty = q_empty * (get_thc_rate(asal, "MT", "L") + get_thc_rate(tujuan, "MT", "D"))
-
-        subtotal = thc_full + thc_empty
-        total += subtotal
-
-        detail_rows.append([asal, tujuan, q_full, q_empty, thc_full, thc_empty, subtotal])
-
-    detail_df = pd.DataFrame(
-        detail_rows,
-        columns=["Asal", "Tujuan", "Q_full", "Q_empty", "THC_full", "THC_empty", "THC_leg"]
-    )
-    return total, detail_df
-
-def calculate_total_thc_per_port(df_revenue):
-    full_flows  = _build_full_flows(df_revenue)      # dari kode kamu sebelumnya
-    empty_flows = compute_empty_flows(df_revenue)    # logika net-flow (yang sudah diperbaiki)
-
-    # port ledger: akumulasi qty & biaya per port
     led = defaultdict(lambda: {
         "Q_full_L": 0.0, "Q_full_D": 0.0,
         "Q_empty_L": 0.0, "Q_empty_D": 0.0,
@@ -381,16 +314,12 @@ def calculate_total_thc_per_port(df_revenue):
     })
 
     def add_full(asal, tujuan, q_full):
-        # rule HUB-HUB => no THC (mengikuti rule kamu sebelumnya)
         if asal in HUBS and tujuan in HUBS:
             return
-
-        # FULL loading di asal
         rate_L = get_thc_rate(asal, "FL", "L")
         led[asal]["Q_full_L"] += q_full
         led[asal]["THC_full_L"] += q_full * rate_L
 
-        # FULL discharging di tujuan
         rate_D = get_thc_rate(tujuan, "FL", "D")
         led[tujuan]["Q_full_D"] += q_full
         led[tujuan]["THC_full_D"] += q_full * rate_D
@@ -398,29 +327,22 @@ def calculate_total_thc_per_port(df_revenue):
     def add_empty(asal, tujuan, q_empty):
         if q_empty <= 0:
             return
-        # rule HUB-HUB => no THC
         if asal in HUBS and tujuan in HUBS:
             return
-
-        # EMPTY loading di asal
         rate_L = get_thc_rate(asal, "MT", "L")
         led[asal]["Q_empty_L"] += q_empty
         led[asal]["THC_empty_L"] += q_empty * rate_L
 
-        # EMPTY discharging di tujuan
         rate_D = get_thc_rate(tujuan, "MT", "D")
         led[tujuan]["Q_empty_D"] += q_empty
         led[tujuan]["THC_empty_D"] += q_empty * rate_D
 
-    # 1) FULL dari df_revenue (yang sudah digabung oleh _build_full_flows)
     for (asal, tujuan), q_full in full_flows.items():
         add_full(asal, tujuan, q_full)
 
-    # 2) EMPTY dari hasil net-flow
     for (asal, tujuan), q_empty in empty_flows.items():
         add_empty(asal, tujuan, q_empty)
 
-    # build dataframe per port
     rows = []
     total = 0.0
     for port, v in led.items():
@@ -436,181 +358,367 @@ def calculate_total_thc_per_port(df_revenue):
             thc_total
         ])
 
-    df_port = pd.DataFrame(rows, columns=[
+    df_port_thc = pd.DataFrame(rows, columns=[
         "Port",
         "Q_full_L", "Q_full_D", "Q_empty_L", "Q_empty_D",
         "THC_full_L", "THC_full_D", "THC_empty_L", "THC_empty_D",
         "THC_port"
     ]).sort_values("THC_port", ascending=False).reset_index(drop=True)
 
-    return total, df_port
+    return total, df_port_thc
+
 
 # ==========================================
-# 3. UI DASHBOARD
+# 3. STATE & INPUTS (DIPINDAH KE ATAS)
 # ==========================================
-st.title("🚢 Kalkulasi Operasional Kapal (Detail Fuel)")
-st.markdown("---")
+def init_state():
+    if "page" not in st.session_state:
+        st.session_state.page = "Beranda"
+    if "last_route" not in st.session_state:
+        st.session_state.last_route = ""
+    if "df_revenue" not in st.session_state:
+        st.session_state.df_revenue = pd.DataFrame()
 
-# --- SIDEBAR INPUTS ---
-with st.sidebar:
-    st.header("1. Input Data Kapal & Rute")
-    selected_ship = st.selectbox("Pilih Kapal", df_kapal["Nama Kapal"])
-    input_route = st.text_input("Rute (ex: SBY-JKT-MKS)", "SBY-JKT-MKS")
-    ship_speed = st.number_input("Kecepatan Kapal (knot)", 1.0, 30.0, 10.0, 1.0)
-    
-    st.markdown("---")
-    st.header("2. Harga Bahan Bakar")
-    
-    fuel_options = ["MFO (Marine Fuel Oil)", "Biosolar"]
-    fuel_prices = {"MFO (Marine Fuel Oil)": 12600, "Biosolar": 20750}
-    
-    # Dual Input BBM (Sesuai Request)
-    fuel_type_me = st.selectbox("Jenis BBM Main Engine (ME)", fuel_options, index=0)
-    fuel_type_ae = st.selectbox("Jenis BBM Aux Engine (AE)", fuel_options, index=1)
-    
-    price_me = fuel_prices[fuel_type_me]
-    price_ae = fuel_prices[fuel_type_ae]
-    
-    st.caption(f"Harga ME: Rp {price_me:,.0f} | Harga AE: Rp {price_ae:,.0f}")
-    
-    if 'last_route' not in st.session_state: st.session_state.last_route = ""
+def goto(page_name: str):
+    st.session_state.page = page_name
+    st.rerun()
+
+def render_top_inputs():
+    st.markdown("""
+    <style>
+    /* Sisakan ruang konstan supaya konten bawah tidak ketiban panel fixed */
+    div.block-container { 
+    padding-top: 20px !important;   /* kamu bisa naik-turunin */
+    }
+
+    /* Jadikan expander PERTAMA sebagai panel fixed di paling atas */
+    details[data-testid="stExpander"]:first-of-type{
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    margin: 0 !important;
+
+    background: rgba(14,17,23,0.96) !important;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.10) !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+    }
+
+    /* Rapikan summary (bar atas expander) */
+    details[data-testid="stExpander"]:first-of-type > summary{
+    padding: 0.75rem 1rem !important;
+    }
+
+    /* Rapikan body expander */
+    details[data-testid="stExpander"]:first-of-type > div{
+    padding: 0.25rem 1rem 1rem 1rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("## 🚢 Shipping Calculation Dashboard")
+
+        # ===== NAVIGASI: 4 TOMBOL BESAR (tanpa Beranda) =====
+    st.markdown("""
+    <style>
+      /* Khusus tombol navigasi atas */
+      div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {
+        padding: 1.0rem 1.1rem !important;
+        font-size: 1.05rem !important;
+        font-weight: 700 !important;
+        border-radius: 16px !important;
+        min-height: 64px !important;
+        width: 100% !important;
+      }
+      @media (min-width: 1100px){
+        div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button{
+          font-size: 1.15rem !important;
+          min-height: 74px !important;
+        }
+      }
+    </style>
+    """, unsafe_allow_html=True)
+
+    with st.expander("⚙️ Input Kapal & Rute (klik untuk buka/tutup)", expanded=False):
+        c1, c2, c3, c4 = st.columns([1.1, 1.2, 0.9, 1.8])
+
+        with c1:
+            selected_ship = st.selectbox("Pilih Kapal", df_kapal["Nama Kapal"], key="ship_select")
+
+        with c2:
+            input_route = st.text_input("Rute (ex: SBY-JKT-MKS)", value="SBY-JKT-MKS", key="route_input")
+
+        with c3:
+            ship_speed = st.number_input("Kecepatan (knot)", min_value=1.0, max_value=30.0,
+                                        value=10.0, step=1.0, key="speed_input")
+
+        with c4:
+            fuel_options = ["MFO (Marine Fuel Oil)", "Biosolar"]
+            fuel_prices = {"MFO (Marine Fuel Oil)": 12600, "Biosolar": 20750}
+
+            cc1, cc2 = st.columns(2)
+            with cc1:
+                fuel_type_me = st.selectbox("BBM Main Engine (ME)", fuel_options, index=0, key="fuel_me")
+            with cc2:
+                fuel_type_ae = st.selectbox("BBM Aux Engine (AE)", fuel_options, index=1, key="fuel_ae")
+
+            price_me = fuel_prices[fuel_type_me]
+            price_ae = fuel_prices[fuel_type_ae]
+            st.caption(f"Harga ME: Rp {price_me:,.0f} | Harga AE: Rp {price_ae:,.0f}")
+
+    # route change logic tetap sama
     if input_route != st.session_state.last_route:
         st.session_state.df_revenue = generate_revenue_template(input_route)
         st.session_state.last_route = input_route
+        st.session_state.pop("editor_revenue", None)
 
-if 'df_revenue' not in st.session_state: st.session_state.df_revenue = pd.DataFrame()
 
-col1, col2 = st.columns([1, 2])
+    n1, n2, n3, n4 = st.columns(4)
+    with n1:
+        st.button("⛽ Estimasi BBM", use_container_width=True,
+                  on_click=goto, args=(NAV_PAGES[0],),
+                  disabled=(st.session_state.page == NAV_PAGES[0]))
+    with n2:
+        st.button("📄 DOC+OH", use_container_width=True,
+                  on_click=goto, args=(NAV_PAGES[1],),
+                  disabled=(st.session_state.page == NAV_PAGES[1]))
+    with n3:
+        st.button("💰 Revenue & THC", use_container_width=True,
+                  on_click=goto, args=(NAV_PAGES[2],),
+                  disabled=(st.session_state.page == NAV_PAGES[2]))
+    with n4:
+        st.button("📊 Ringkasan", use_container_width=True,
+                  on_click=goto, args=(NAV_PAGES[3],),
+                  disabled=(st.session_state.page == NAV_PAGES[3]))
 
-# --- PANEL KIRI: COST CALCULATION ---
-with col1:
-    st.subheader("Estimasi Biaya Operasional")
+    st.markdown("---")
+
+
+    # Input panel di atas (ganti sidebar)
     
-    res, err = calculate_operational_cost(selected_ship, input_route, ship_speed)
-    if err:
-        st.error(err)
-        total_cost_final = 0
-        total_thc = 0
-    else:
-        # Kalkulasi Biaya Rupiah Per Komponen
-        # 1. Sailing ME
-        cost_me_sailing = res['ME_Sailing_L'] * price_me
-        
-        # 2. Sailing AE
-        cost_ae_sailing = res['AE_Sailing_L'] * price_ae
-        
-        # 3. Port AE
-        cost_ae_port = res['AE_Port_L'] * price_ae
-        
-        cost_bbm_total = cost_me_sailing + cost_ae_sailing + cost_ae_port
-        
-        # Total Variable Cost (BBM + DOC)
-        total_cost_final = cost_bbm_total + res['DOC_Total_Cost']
-        
-        # --- SECTION 1: BBM ---
-        st.markdown("#### A. Biaya Bahan Bakar (BBM)")
-        with st.container():
-            # Pecah 3 Kolom
-            c1, c2, c3 = st.columns(3)
-            
-            # Kolom 1: Sailing ME
-            c1.markdown("**Sailing ME**")
-            c1.caption(f"Jenis: {fuel_type_me.split(' ')[0]}")
-            c1.write(f"Vol: {res['ME_Sailing_L']:,.0f} L")
-            c1.write(f"**{format_rupiah_compact(cost_me_sailing)}**")
-            
-            # Kolom 2: Sailing AE
-            c2.markdown("**Sailing AE**")
-            c2.caption(f"Jenis: {fuel_type_ae.split(' ')[0]}")
-            c2.write(f"Vol: {res['AE_Sailing_L']:,.0f} L")
-            c2.write(f"**{format_rupiah_compact(cost_ae_sailing)}**")
-            
-            # Kolom 3: Port AE
-            c3.markdown("**Port AE**")
-            c3.caption(f"Jenis: {fuel_type_ae.split(' ')[0]}")
-            c3.write(f"Vol: {res['AE_Port_L']:,.0f} L")
-            c3.write(f"**{format_rupiah_compact(cost_ae_port)}**")
-            
-            st.divider()
-            st.info(f"Total Biaya BBM: **{format_rupiah_compact(cost_bbm_total)}**")
 
-        # --- SECTION 2: DOC+OH ---
-        st.markdown("#### B. Biaya Operasional (DOC+OH)")
-        with st.container():
-            st.write(f"Total Durasi Trip: **{res['Total_Days']:.1f} Hari**")
-            st.caption(f"Daily Rate: {format_rupiah_compact(res['DOC_Daily_Rate'])}")
-            st.info(f"Total DOC Cost: **{format_rupiah_compact(res['DOC_Total_Cost'])}**")
-            
-        # --- Total Cost ---
-        st.success(f"### Total Est. Cost: {format_rupiah_compact(total_cost_final)}")
-        st.caption("*Belum termasuk THC")
+    return selected_ship, input_route, ship_speed, fuel_type_me, fuel_type_ae, price_me, price_ae
 
-# --- PANEL KANAN: REVENUE & THC ---
-with col2:
+
+def compute_cost_breakdown(res, price_me, price_ae):
+    cost_me_sailing = res["ME_Sailing_L"] * price_me
+    cost_ae_sailing = res["AE_Sailing_L"] * price_ae
+    cost_ae_port    = res["AE_Port_L"]    * price_ae
+    cost_bbm_total   = cost_me_sailing + cost_ae_sailing + cost_ae_port
+    total_cost_final = cost_bbm_total + res["DOC_Total_Cost"]
+    return {
+        "cost_me_sailing": cost_me_sailing,
+        "cost_ae_sailing": cost_ae_sailing,
+        "cost_ae_port": cost_ae_port,
+        "cost_bbm_total": cost_bbm_total,
+        "total_cost_final": total_cost_final,
+    }
+
+
+# ==========================================
+# 4. PAGES
+# ==========================================
+def page_beranda():
+    st.subheader("Beranda")
+    st.write("Pilih halaman untuk melihat detail perhitungan.")
+
+    # CSS hanya untuk halaman Beranda (dibuat besar + tinggi)
+    st.markdown("""
+    <style>
+    /* Perbesar tombol khusus Beranda */
+    div[data-testid="stButton"] > button {
+        width: 100%;
+        padding: 1.3rem 1.2rem !important;
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        border-radius: 18px !important;
+        min-height: 78px !important;
+    }
+    /* Biar lebih lega di layar besar */
+    @media (min-width: 1100px) {
+        div[data-testid="stButton"] > button {
+            font-size: 1.25rem !important;
+            min-height: 92px !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Grid 2x2 supaya tombol makin nyaman dilihat
+    r1c1, r1c2 = st.columns(2)
+    r2c1, r2c2 = st.columns(2)
+
+    with r1c1:
+        st.button("📌 Estimasi BBM", use_container_width=True, on_click=goto, args=("Estimasi Biaya Operasional (BBM)",))
+    with r1c2:
+        st.button("📌 Biaya Operasional (DOC+OH)", use_container_width=True, on_click=goto, args=("Biaya Operasional (DOC+OH)",))
+    with r2c1:
+        st.button("📌 Perencanaan Revenue & THC", use_container_width=True, on_click=goto, args=("Perencanaan Revenue & THC",))
+    with r2c2:
+        st.button("📌 Ringkasan Akhir", use_container_width=True, on_click=goto, args=("Ringkasan Akhir",))
+
+    st.markdown("---")
+    st.info("Input kapal, rute, kecepatan, dan BBM ada di bagian atas. Data revenue bisa diinput di halaman Revenue & THC.")
+
+
+
+def page_estimasi_bbm(res, fuel_type_me, fuel_type_ae, price_me, price_ae):
+    st.subheader("Estimasi Biaya Operasional — BBM")
+
+    br = compute_cost_breakdown(res, price_me, price_ae)
+
+    st.markdown("#### A. Biaya Bahan Bakar (BBM)")
+    c1, c2, c3 = st.columns(3)
+
+    c1.markdown("**Sailing ME**")
+    c1.caption(f"Jenis: {fuel_type_me.split(' ')[0]}")
+    c1.write(f"Vol: {res['ME_Sailing_L']:,.0f} L")
+    c1.write(f"**{format_rupiah_compact(br['cost_me_sailing'])}**")
+
+    c2.markdown("**Sailing AE**")
+    c2.caption(f"Jenis: {fuel_type_ae.split(' ')[0]}")
+    c2.write(f"Vol: {res['AE_Sailing_L']:,.0f} L")
+    c2.write(f"**{format_rupiah_compact(br['cost_ae_sailing'])}**")
+
+    c3.markdown("**Port AE**")
+    c3.caption(f"Jenis: {fuel_type_ae.split(' ')[0]}")
+    c3.write(f"Vol: {res['AE_Port_L']:,.0f} L")
+    c3.write(f"**{format_rupiah_compact(br['cost_ae_port'])}**")
+
+    st.divider()
+    st.success(f"Total Biaya BBM: {format_rupiah_compact(br['cost_bbm_total'])}")
+
+    st.markdown("---")
+    st.caption("Halaman ini hanya menampilkan komponen BBM. DOC+OH ada di halaman terpisah.")
+
+
+def page_doc_oh(res, price_me, price_ae):
+    st.subheader("Biaya Operasional — DOC+OH")
+
+    br = compute_cost_breakdown(res, price_me, price_ae)
+
+    st.markdown("#### B. Biaya Operasional (DOC+OH)")
+    st.write(f"Total Durasi Trip: **{res['Total_Days']:.1f} Hari**")
+    st.caption(f"Daily Rate: {format_rupiah_compact(res['DOC_Daily_Rate'])}")
+    st.success(f"Total DOC Cost: {format_rupiah_compact(res['DOC_Total_Cost'])}")
+
+    st.markdown("---")
+    st.info(f"Total Est. Cost (BBM + DOC) saat ini: **{format_rupiah_compact(br['total_cost_final'])}**")
+
+
+def page_revenue_thc(total_cost_final):
     st.subheader("Perencanaan Revenue & THC")
-    if not st.session_state.df_revenue.empty:
-        st.data_editor(
-            st.session_state.df_revenue,
-            column_config={
-                "Kombinasi": st.column_config.TextColumn(disabled=True),
-                "Port Asal": st.column_config.TextColumn(disabled=True),
-                "Port Tujuan": st.column_config.TextColumn(disabled=True),
-                "Jumlah Box": st.column_config.NumberColumn(required=True, min_value=0),
-                "Harga/TEU (Rp)": st.column_config.NumberColumn(required=True, min_value=0, format="Rp %d"),
-                "Total Revenue (Rp)": st.column_config.NumberColumn(disabled=True, format="Rp %d") 
-            },
-            hide_index=True, use_container_width=True, key="editor_revenue", on_change=recalculate_revenue
-        )
-        
-        total_rev = st.session_state.df_revenue["Total Revenue (Rp)"].sum() * 1.8
-        total_box = st.session_state.df_revenue["Jumlah Box"].sum()
-        
-                # Hitung THC berdasarkan Revenue Table
-        total_thc, df_thc_detail = calculate_total_thc_per_port(st.session_state.df_revenue)
 
-        # =========================
-        # (Opsional) tampilkan rincian THC tetap di sini
-        # =========================
-        st.markdown("#### Terminal Handling (THC)")
-        t1, t2 = st.columns([1, 2])
-        t1.metric("Total THC", format_rupiah_compact(total_thc))
-        with t2:
-            st.markdown("Rincian THC (per Port)")
-            st.dataframe(df_thc_detail, use_container_width=True, hide_index=True)
+    if st.session_state.df_revenue.empty:
+        st.warning("Revenue template belum terbentuk. Pastikan rute minimal 2 pelabuhan.")
+        return
 
-        # =========================
-        # HITUNG SEMUA ANGKA TOTAL
-        # =========================
-        profit = total_rev - total_cost_final - total_thc
-        is_profit = profit >= 0
-
-        # =========================
-        # TOTAL & SUMMARY DI PALING BAWAH
-        # =========================
-        st.divider()
-        st.markdown("### Ringkasan Akhir (Total)")
-
-        # Baris total utama
-        s1, s2, s3 = st.columns(3)
-        s1.metric("Total Box", f"{total_box:,.0f} TEUs")
-        s2.metric("Total Revenue", format_rupiah_compact(total_rev))
-        s3.metric("Total Cost (BBM+DOC)", format_rupiah_compact(total_cost_final))
-
-        s4, s5 = st.columns(2)
-        # Profit metric dengan warna hijau/merah via delta_color
-        s5.metric(
-            "NET PROFIT / (LOSS)",
-            format_rupiah_compact(profit),
-            delta=("PROFIT" if is_profit else "LOSS"),
-            delta_color=("normal" if is_profit else "inverse"),
-            help="Revenue - (BBM + DOC + THC)"
+    # pastikan total revenue ter-update
+    if "Total Revenue (Rp)" in st.session_state.df_revenue.columns:
+        # kalau baru pertama kali, hitung ulang supaya tidak 0 semua
+        st.session_state.df_revenue["Total Revenue (Rp)"] = (
+            st.session_state.df_revenue["Jumlah Box"] * st.session_state.df_revenue["Harga/TEU (Rp)"]
         )
 
-        # Total THC ikut berwarna (via delta)
-        s4.metric(
-            "Total THC",
-            format_rupiah_compact(total_thc),
-            
-            help="Terminal Handling Charges"
-        )
+    st.data_editor(
+        st.session_state.df_revenue,
+        column_config={
+            "Kombinasi": st.column_config.TextColumn(disabled=True),
+            "Port Asal": st.column_config.TextColumn(disabled=True),
+            "Port Tujuan": st.column_config.TextColumn(disabled=True),
+            "Jumlah Box": st.column_config.NumberColumn(required=True, min_value=0),
+            "Harga/TEU (Rp)": st.column_config.NumberColumn(required=True, min_value=0, format="Rp %d"),
+            "Total Revenue (Rp)": st.column_config.NumberColumn(disabled=True, format="Rp %d"),
+        },
+        hide_index=True,
+        use_container_width=True,
+        key="editor_revenue",
+        on_change=recalculate_revenue
+    )
 
+    total_rev = float(st.session_state.df_revenue["Total Revenue (Rp)"].sum()) * 1.8
+    total_box = float(st.session_state.df_revenue["Jumlah Box"].sum())
+
+    total_thc, df_thc_detail = calculate_total_thc_per_port(st.session_state.df_revenue)
+
+    st.markdown("#### Terminal Handling (THC)")
+    t1, t2 = st.columns([1, 2])
+    t1.metric("Total THC", format_rupiah_compact(total_thc))
+    with t2:
+        st.markdown("Rincian THC (per Port)")
+        st.dataframe(df_thc_detail, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.markdown("#### Ringkasan Cepat (di halaman ini)")
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Total Box", f"{total_box:,.0f} TEUs")
+    s2.metric("Total Revenue", format_rupiah_compact(total_rev))
+    s3.metric("Total Cost (BBM+DOC)", format_rupiah_compact(total_cost_final))
+
+
+def page_ringkasan(total_cost_final):
+    st.subheader("Ringkasan Akhir (Total)")
+
+    if st.session_state.df_revenue.empty:
+        st.warning("Revenue template belum terbentuk. Isi rute minimal 2 pelabuhan.")
+        return
+
+    total_rev = float(st.session_state.df_revenue["Total Revenue (Rp)"].sum()) * 1.8
+    total_box = float(st.session_state.df_revenue["Jumlah Box"].sum())
+
+    total_thc, df_thc_detail = calculate_total_thc_per_port(st.session_state.df_revenue)
+    profit = total_rev - total_cost_final - total_thc
+    is_profit = profit >= 0
+
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Total Box", f"{total_box:,.0f} TEUs")
+    s2.metric("Total Revenue", format_rupiah_compact(total_rev))
+    s3.metric("Total Cost (BBM+DOC)", format_rupiah_compact(total_cost_final))
+
+    s4, s5 = st.columns(2)
+    s4.metric("Total THC", format_rupiah_compact(total_thc), help="Terminal Handling Charges")
+    s5.metric(
+        "NET PROFIT / (LOSS)",
+        format_rupiah_compact(profit),
+        delta=("PROFIT" if is_profit else "LOSS"),
+        delta_color=("normal" if is_profit else "inverse"),
+        help="Revenue - (BBM + DOC + THC)"
+    )
+
+    st.markdown("---")
+    st.markdown("#### Rincian THC (per Port)")
+    st.dataframe(df_thc_detail, use_container_width=True, hide_index=True)
+
+
+# ==========================================
+# 5. MAIN APP FLOW
+# ==========================================
+init_state()
+
+selected_ship, input_route, ship_speed, fuel_type_me, fuel_type_ae, price_me, price_ae = render_top_inputs()
+
+res, err = calculate_operational_cost(selected_ship, input_route, ship_speed)
+
+if err:
+    st.error(err)
+    st.stop()
+
+br = compute_cost_breakdown(res, price_me, price_ae)
+total_cost_final = br["total_cost_final"]
+
+# Router
+if st.session_state.page == "Beranda":
+    page_beranda()
+elif st.session_state.page == "Estimasi Biaya Operasional (BBM)":
+    page_estimasi_bbm(res, fuel_type_me, fuel_type_ae, price_me, price_ae)
+elif st.session_state.page == "Biaya Operasional (DOC+OH)":
+    page_doc_oh(res, price_me, price_ae)
+elif st.session_state.page == "Perencanaan Revenue & THC":
+    page_revenue_thc(total_cost_final)
+elif st.session_state.page == "Ringkasan Akhir":
+    page_ringkasan(total_cost_final)
+else:
+    st.session_state.page = "Beranda"
+    st.rerun()
